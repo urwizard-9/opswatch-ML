@@ -10,8 +10,10 @@ def _setup_down_incident(client) -> tuple[int, int]:
 
     with patch("app.routers.checks.check_server") as mock_check:
         mock_check.return_value = {
-            "status": "DOWN", "status_code": 500,
-            "response_time_ms": 100.0, "message": "HTTP 500 오류",
+            "status": "DOWN",
+            "status_code": 500,
+            "response_time_ms": 100.0,
+            "message": "HTTP 500 오류",
         }
         client.post(f"/checks/run/{sid}")
 
@@ -65,10 +67,13 @@ def test_resolve_incident(client):
     """Incident 해결 처리 후 RESOLVED, resolved_at 기록."""
     _, iid = _setup_down_incident(client)
 
-    res = client.put(f"/incidents/{iid}/resolve", json={
-        "reason": "메모리 누수로 인한 다운",
-        "action_taken": "서버 재시작 및 메모리 캐시 초기화",
-    })
+    res = client.put(
+        f"/incidents/{iid}/resolve",
+        json={
+            "reason": "메모리 누수로 인한 다운",
+            "action_taken": "서버 재시작 및 메모리 캐시 초기화",
+        },
+    )
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "RESOLVED"
@@ -82,8 +87,8 @@ def test_resolve_incident_already_resolved(client):
     _, iid = _setup_down_incident(client)
     body = {"reason": "r", "action_taken": "a"}
 
-    client.put(f"/incidents/{iid}/resolve", json=body)           # 1차 해결
-    res = client.put(f"/incidents/{iid}/resolve", json=body)     # 2차 시도
+    client.put(f"/incidents/{iid}/resolve", json=body)  # 1차 해결
+    res = client.put(f"/incidents/{iid}/resolve", json=body)  # 2차 시도
     assert res.status_code == 400
 
 
@@ -95,8 +100,10 @@ def test_new_incident_after_resolve(client):
     # 동일 서버 재DOWN
     with patch("app.routers.checks.check_server") as mock_check:
         mock_check.return_value = {
-            "status": "DOWN", "status_code": 500,
-            "response_time_ms": 100.0, "message": "HTTP 500 오류",
+            "status": "DOWN",
+            "status_code": 500,
+            "response_time_ms": 100.0,
+            "message": "HTTP 500 오류",
         }
         client.post(f"/checks/run/{sid}")
 

@@ -7,7 +7,7 @@
 import logging
 import sys
 
-from app.core.config import settings
+from app.config import settings
 
 # 로그 포맷: 타임스탬프 | 레벨 | 파일:라인 (함수) | 메시지
 LOG_FORMAT = "%(asctime)s | %(levelname)-7s | %(filename)s:%(lineno)d (%(funcName)s) | %(message)s"

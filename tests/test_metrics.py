@@ -73,6 +73,7 @@ def test_mock_crash(client):
     from app.database import get_db
     from app.main import app
     from tests.conftest import override_get_db
+
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app, raise_server_exceptions=False) as crash_client:
         res = crash_client.get("/mock/crash")

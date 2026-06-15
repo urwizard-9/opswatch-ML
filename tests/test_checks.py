@@ -113,8 +113,18 @@ def test_check_all(client):
     _register_server(client, "s2", "http://b.com")
 
     results_map = {
-        "http://a.com": {"status": "UP", "status_code": 200, "response_time_ms": 100.0, "message": "ok"},
-        "http://b.com": {"status": "DOWN", "status_code": 500, "response_time_ms": 200.0, "message": "error"},
+        "http://a.com": {
+            "status": "UP",
+            "status_code": 200,
+            "response_time_ms": 100.0,
+            "message": "ok",
+        },
+        "http://b.com": {
+            "status": "DOWN",
+            "status_code": 500,
+            "response_time_ms": 200.0,
+            "message": "error",
+        },
     }
 
     def side_effect(url):
@@ -136,8 +146,10 @@ def test_check_history(client):
 
     with patch("app.routers.checks.check_server") as mock_check:
         mock_check.return_value = {
-            "status": "UP", "status_code": 200,
-            "response_time_ms": 50.0, "message": "ok",
+            "status": "UP",
+            "status_code": 200,
+            "response_time_ms": 50.0,
+            "message": "ok",
         }
         client.post(f"/checks/run/{sid}")
         client.post(f"/checks/run/{sid}")

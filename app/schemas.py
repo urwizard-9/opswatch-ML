@@ -40,9 +40,7 @@ class ServerCreate(BaseModel):
     name: str = Field(..., min_length=1, description="서버 이름")
     url: str = Field(..., min_length=1, description="점검 URL")
     description: str = Field(default="", description="서버 설명")
-    importance: ImportanceLevel = Field(
-        default=ImportanceLevel.MEDIUM, description="중요도"
-    )
+    importance: ImportanceLevel = Field(default=ImportanceLevel.MEDIUM, description="중요도")
 
     @field_validator("url")
     @classmethod

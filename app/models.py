@@ -48,9 +48,7 @@ class Incident(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     server_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
-    status: Mapped[str] = mapped_column(
-        String, nullable=False, default="OPEN"
-    )  # OPEN, RESOLVED
+    status: Mapped[str] = mapped_column(String, nullable=False, default="OPEN")  # OPEN, RESOLVED
     reason: Mapped[str | None] = mapped_column(String, nullable=True)
     action_taken: Mapped[str | None] = mapped_column(String, nullable=True)
     github_issue_url: Mapped[str | None] = mapped_column(String, nullable=True)

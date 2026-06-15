@@ -7,8 +7,8 @@ import time
 
 import httpx
 
-from app.core.config import settings
-from app.core.logging_config import get_logger
+from app.config import settings
+from app.logging_config import get_logger
 from app.routers.metrics import update_check_metrics
 
 logger = get_logger(__name__)
@@ -40,12 +40,16 @@ async def check_server(url: str) -> dict:
             "response_time_ms": round(elapsed_ms, 2),
             "message": message,
         }
-        logger.info("SERVER_%s | url=%s | %dms | HTTP %d", status, url, elapsed_ms, response.status_code)
+        logger.info(
+            "SERVER_%s | url=%s | %dms | HTTP %d", status, url, elapsed_ms, response.status_code
+        )
         update_check_metrics(status, result["response_time_ms"])
         return result
 
     except httpx.TimeoutException:
-        logger.warning("SERVER_DOWN | url=%s | Timeout (%d초 초과)", url, settings.CHECK_TIMEOUT_SECONDS)
+        logger.warning(
+            "SERVER_DOWN | url=%s | Timeout (%d초 초과)", url, settings.CHECK_TIMEOUT_SECONDS
+        )
         result = {
             "status": "DOWN",
             "status_code": None,
@@ -74,5 +78,3 @@ async def check_server(url: str) -> dict:
         }
         update_check_metrics("DOWN", None)
         return result
-
-

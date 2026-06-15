@@ -3,11 +3,14 @@
 
 def test_create_server_success(client):
     """정상적인 서버 등록."""
-    res = client.post("/servers", json={
-        "name": "test-server",
-        "url": "http://example.com",
-        "importance": "HIGH",
-    })
+    res = client.post(
+        "/servers",
+        json={
+            "name": "test-server",
+            "url": "http://example.com",
+            "importance": "HIGH",
+        },
+    )
     assert res.status_code == 201
     data = res.json()
     assert data["name"] == "test-server"
@@ -26,10 +29,13 @@ def test_create_server_duplicate_name(client):
 
 def test_create_server_invalid_url(client):
     """http/https 아닌 URL은 422."""
-    res = client.post("/servers", json={
-        "name": "bad",
-        "url": "ftp://example.com",
-    })
+    res = client.post(
+        "/servers",
+        json={
+            "name": "bad",
+            "url": "ftp://example.com",
+        },
+    )
     assert res.status_code == 422
 
 

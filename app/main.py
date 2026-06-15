@@ -6,9 +6,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 import app.database as _db
-from app.core.config import settings
-from app.core.logging_config import get_logger, setup_logging
+from app.config import settings
 from app.database import Base
+from app.logging_config import get_logger, setup_logging
 from app.routers import checks, incidents, metrics, mock_targets, servers
 from app.schemas import HealthResponse
 from app.services.scheduler import run_scheduled_checks

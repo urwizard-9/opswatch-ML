@@ -3,7 +3,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-from app.core.config import settings
+from app.config import settings
 
 # SQLAlchemy 엔진 생성
 # SQLite의 경우 check_same_thread=False 필요

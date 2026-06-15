@@ -1,6 +1,5 @@
 """OpsWatch 설정 관리 모듈."""
 
-
 from pydantic_settings import BaseSettings
 
 

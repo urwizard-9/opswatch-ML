@@ -7,15 +7,13 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from app.core.logging_config import get_logger
+from app.logging_config import get_logger
 from app.models import Incident
 
 logger = get_logger(__name__)
 
 
-def create_incident_if_needed(
-    db: Session, server_id: int, reason: str
-) -> Incident | None:
+def create_incident_if_needed(db: Session, server_id: int, reason: str) -> Incident | None:
     """DOWN 발생 시 해당 서버에 OPEN 상태의 Incident가 없으면 새로 생성합니다.
 
     이미 OPEN 상태의 Incident가 있으면 중복 생성하지 않고 None을 반환합니다.
@@ -38,7 +36,11 @@ def create_incident_if_needed(
     )
 
     if existing:
-        logger.info("INCIDENT_DUPLICATE_SKIPPED | server_id=%d | 기존 OPEN Incident #%d", server_id, existing.id)
+        logger.info(
+            "INCIDENT_DUPLICATE_SKIPPED | server_id=%d | 기존 OPEN Incident #%d",
+            server_id,
+            existing.id,
+        )
         return None
 
     incident = Incident(
@@ -50,13 +52,13 @@ def create_incident_if_needed(
     db.add(incident)
     db.commit()
     db.refresh(incident)
-    logger.warning("INCIDENT_CREATED | id=%d | server_id=%d | reason=%s", incident.id, server_id, reason)
+    logger.warning(
+        "INCIDENT_CREATED | id=%d | server_id=%d | reason=%s", incident.id, server_id, reason
+    )
     return incident
 
 
-def resolve_incident(
-    db: Session, incident: Incident, reason: str, action_taken: str
-) -> Incident:
+def resolve_incident(db: Session, incident: Incident, reason: str, action_taken: str) -> Incident:
     """OPEN 상태의 Incident를 RESOLVED로 변경합니다.
 
     Args:
@@ -74,5 +76,10 @@ def resolve_incident(
     incident.resolved_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(incident)
-    logger.info("INCIDENT_RESOLVED | id=%d | server_id=%d | action=%s", incident.id, incident.server_id, action_taken)
+    logger.info(
+        "INCIDENT_RESOLVED | id=%d | server_id=%d | action=%s",
+        incident.id,
+        incident.server_id,
+        action_taken,
+    )
     return incident

@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.logging_config import get_logger
 from app.database import get_db
+from app.logging_config import get_logger
 from app.models import Server
 from app.schemas import ServerCreate, ServerResponse, ServerUpdate
 
@@ -55,9 +55,7 @@ def get_server(server_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{server_id}", response_model=ServerResponse)
-def update_server(
-    server_id: int, server_data: ServerUpdate, db: Session = Depends(get_db)
-):
+def update_server(server_id: int, server_data: ServerUpdate, db: Session = Depends(get_db)):
     """서버 정보를 수정합니다."""
     server = db.query(Server).filter(Server.id == server_id).first()
     if not server:
