@@ -47,3 +47,6 @@ docker-compose.override.yml
 
 # 프로젝트 관리 문서 (로컬 전용, docs/ 디렉토리)
 docs/
+
+# ML Artifacts (Local Temp Models)
+ml/artifacts/

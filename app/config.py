@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     GH_REPO: str = ""
     GH_TOKEN: str = ""
 
+    # MLflow 설정 (Model Serving 및 MLOps 용도)
+    MLFLOW_TRACKING_URI: str = "http://54.116.200.84"
+    MLFLOW_TRACKING_USERNAME: str = "user231937"
+    MLFLOW_TRACKING_PASSWORD: str = "pass231937!"
+    MLFLOW_MODEL_NAME: str = "opswatch-incident-model"
+    MLFLOW_MODEL_ALIAS: str = "champion"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
