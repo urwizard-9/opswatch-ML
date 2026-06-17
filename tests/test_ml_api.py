@@ -59,3 +59,14 @@ def test_predict_risk_invalid_data(client):
     }
     response = client.post("/ml/predict-risk", json=payload)
     assert response.status_code == 422
+
+
+def test_reload_model_success(client):
+    """POST /ml/reload-model API가 정상적으로 모델을 다시 로드하고 200 응답을 주는지 테스트합니다."""
+    response = client.post("/ml/reload-model")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert "model_info" in data
+    assert data["model_info"]["is_loaded"] is True
+
