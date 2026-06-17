@@ -1,0 +1,45 @@
+name: OpsWatch Docker Verify
+
+on:
+  workflow_run:
+    workflows: ["OpsWatch CI"]
+    types:
+      - completed
+
+jobs:
+  docker:
+    name: Docker 빌드 + Smoke Test
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Docker 빌드
+        run: docker build -t opswatch:ci .
+
+      - name: Smoke Test (컨테이너 실행 후 /health 확인)
+        run: |
+          docker run -d \
+            --name opswatch-smoke \
+            -p 8000:8000 \
+            -e DATABASE_URL=sqlite:///./opswatch.db \
+            opswatch:ci
+
+          # 최대 30초 대기
+          for i in $(seq 1 10); do
+            sleep 3
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Smoke test 통과 (HTTP $STATUS)"
+              docker stop opswatch-smoke
+              exit 0
+            fi
+            echo "⏳ 대기 중... ($i/10, HTTP $STATUS)"
+          done
+
+          echo "❌ Smoke test 실패"
+          docker logs opswatch-smoke
+          docker stop opswatch-smoke
+          exit 1

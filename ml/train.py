@@ -38,7 +38,7 @@ def train_model():
 
     # 1. 실행 가이드 및 경로 세팅
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    
+
     if args.data_path:
         if os.path.isabs(args.data_path):
             train_path = args.data_path
@@ -48,7 +48,7 @@ def train_model():
              # v2 실행 시 "ml/data/train_v2.csv"가 동적 할당됨
     else:
         train_path = os.path.join(base_dir, "data", "train.csv")
-        
+
     test_path = os.path.join(base_dir, "data", "test.csv")
 
     if not os.path.exists(train_path) or not os.path.exists(test_path):
@@ -111,17 +111,25 @@ def train_model():
     # 5. MLflow 트래킹 및 예외 전파/Fallback 분기 처리
     allow_fallback = os.getenv("ALLOW_MLFLOW_FALLBACK", "false").lower() == "true"
 
-    # MLflow 인증 정보 획득 (Basic Auth 대응)
-    os.environ["MLFLOW_TRACKING_USERNAME"] = settings.MLFLOW_TRACKING_USERNAME
-    os.environ["MLFLOW_TRACKING_PASSWORD"] = settings.MLFLOW_TRACKING_PASSWORD
+    # MLflow 인증 정보 획득 (Basic Auth 대응 - 환경변수 우선 적용)
+    if "MLFLOW_TRACKING_USERNAME" not in os.environ:
+        os.environ["MLFLOW_TRACKING_USERNAME"] = settings.MLFLOW_TRACKING_USERNAME
+    if "MLFLOW_TRACKING_PASSWORD" not in os.environ:
+        os.environ["MLFLOW_TRACKING_PASSWORD"] = settings.MLFLOW_TRACKING_PASSWORD
 
     try:
-        # MLflow Tracking & Registry 설정
-        mlflow.set_tracking_uri(settings.MLFLOW_TRACKING_URI)
-        mlflow.set_registry_uri(settings.MLFLOW_TRACKING_URI)
+        # MLflow Tracking & Registry 설정 (환경변수 우선 적용)
+        tracking_uri = os.getenv("MLFLOW_TRACKING_URI", settings.MLFLOW_TRACKING_URI)
+        mlflow.set_tracking_uri(tracking_uri)
+        mlflow.set_registry_uri(tracking_uri)
         mlflow.set_experiment("opswatch-incident-classification")
 
         with mlflow.start_run(run_name=args.run_name) as run:
+            # GitHub Actions 메타데이터 태그 기록
+            mlflow.set_tag("run_source", os.getenv("RUN_SOURCE", "local"))
+            mlflow.set_tag("github_sha", os.getenv("GITHUB_SHA", "local"))
+            mlflow.set_tag("github_run_id", os.getenv("GITHUB_RUN_ID", "local"))
+
             # 파라미터 기록
             if args.model_type == "rf":
                 mlflow.log_param("model_type", "RandomForestClassifier")
@@ -130,7 +138,7 @@ def train_model():
             elif args.model_type == "lr":
                 mlflow.log_param("model_type", "LogisticRegression")
                 mlflow.log_param("C", args.c_reg)
-                
+
             mlflow.log_param("random_state", 42)
             mlflow.log_param("feature_columns", ",".join(feature_cols))
             mlflow.log_param("train_row_count", len(df_train))
