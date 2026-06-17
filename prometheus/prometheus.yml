@@ -6,5 +6,5 @@ scrape_configs:
   - job_name: "opswatch"
     scheme: https                                    # Render는 HTTPS
     static_configs:
-      - targets: ["opswatch-r42u.onrender.com"]      # Render 운영 서버
+      - targets: ["opswatch-ml-service.onrender.com"]      # Render 운영 서버
     metrics_path: /metrics
