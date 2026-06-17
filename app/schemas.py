@@ -161,3 +161,27 @@ class HealthResponse(BaseModel):
     status: str = "ok"
     service: str = "opswatch"
     version: str = "1.0.0"
+
+
+# --- ML Predict 스키마 ---
+
+
+class MLPredictRequest(BaseModel):
+    """ML 장애 예측 요청 스키마."""
+
+    response_time_ms: float = Field(..., description="응답 시간 (ms)")
+    status_code: int = Field(..., description="HTTP 응답 코드")
+    is_timeout: int = Field(..., ge=0, le=1, description="타임아웃 여부 (0 또는 1)")
+    is_slow: int = Field(..., ge=0, le=1, description="지연 여부 (0 또는 1)")
+    recent_failure_count: int = Field(..., ge=0, description="최근 5회 중 실패 횟수")
+    importance: int = Field(..., ge=1, le=3, description="서버 중요도 (1: LOW, 2: MEDIUM, 3: HIGH)")
+
+
+class MLPredictResponse(BaseModel):
+    """ML 장애 예측 결과 응답 스키마."""
+
+    is_down_pred: int = Field(..., description="예측 장애 여부 (0: 정상, 1: 장애)")
+    risk_score: float = Field(..., description="장애 위험도 점수 (0.0 ~ 1.0)")
+    model_name: str = Field(..., description="사용된 모델 이름")
+    model_alias: str = Field(..., description="사용된 모델 별칭/태그")
+

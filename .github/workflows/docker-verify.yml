@@ -19,24 +19,29 @@ jobs:
       - name: Docker 빌드
         run: docker build -t opswatch:ci .
 
-      - name: Smoke Test (컨테이너 실행 후 /health 확인)
+      - name: Smoke Test (컨테이너 실행 후 /health 및 /ml/model-info 확인)
         run: |
           docker run -d \
             --name opswatch-smoke \
             -p 8000:8000 \
             -e DATABASE_URL=sqlite:///./opswatch.db \
+            -e MLFLOW_TRACKING_URI="${{ secrets.MLFLOW_TRACKING_URI }}" \
+            -e MLFLOW_TRACKING_USERNAME="${{ secrets.MLFLOW_TRACKING_USERNAME }}" \
+            -e MLFLOW_TRACKING_PASSWORD="${{ secrets.MLFLOW_TRACKING_PASSWORD }}" \
+            -e ALLOW_MLFLOW_FALLBACK="false" \
             opswatch:ci
 
-          # 최대 30초 대기
+          # 최대 30초 대기하여 컨테이너 초기화 및 모델 다운로드 보장
           for i in $(seq 1 10); do
             sleep 3
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health || echo "000")
-            if [ "$STATUS" = "200" ]; then
-              echo "✅ Smoke test 통과 (HTTP $STATUS)"
+            HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health || echo "000")
+            ML_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/ml/model-info || echo "000")
+            if [ "$HEALTH_STATUS" = "200" ] && [ "$ML_STATUS" = "200" ]; then
+              echo "✅ Smoke test 통과: /health ($HEALTH_STATUS) 및 /ml/model-info ($ML_STATUS)"
               docker stop opswatch-smoke
               exit 0
             fi
-            echo "⏳ 대기 중... ($i/10, HTTP $STATUS)"
+            echo "⏳ 대기 중... ($i/10, /health: $HEALTH_STATUS, /ml/model-info: $ML_STATUS)"
           done
 
           echo "❌ Smoke test 실패"
