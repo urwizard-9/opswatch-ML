@@ -17,7 +17,7 @@ def test_check_single_up(client):
     sid = _register_server(client, "normal", "http://localhost:8000/mock/normal")
 
     # monitor_service.check_server를 mock으로 대체
-    with patch("app.routers.checks.check_server") as mock_check:
+    with patch("app.services.monitor_service.check_server") as mock_check:
         mock_check.return_value = {
             "status": "UP",
             "status_code": 200,
@@ -37,7 +37,7 @@ def test_check_single_slow(client):
     """SLOW 상태 서버 점검 결과 확인."""
     sid = _register_server(client, "slow", "http://localhost:8000/mock/slow")
 
-    with patch("app.routers.checks.check_server") as mock_check:
+    with patch("app.services.monitor_service.check_server") as mock_check:
         mock_check.return_value = {
             "status": "SLOW",
             "status_code": 200,
@@ -54,7 +54,7 @@ def test_check_single_down_creates_incident(client):
     """DOWN 시 Incident 자동 생성 확인."""
     sid = _register_server(client, "error", "http://localhost:8000/mock/error")
 
-    with patch("app.routers.checks.check_server") as mock_check:
+    with patch("app.services.monitor_service.check_server") as mock_check:
         mock_check.return_value = {
             "status": "DOWN",
             "status_code": 500,
@@ -130,7 +130,7 @@ def test_check_all(client):
     def side_effect(url):
         return results_map[url]
 
-    with patch("app.routers.checks.check_server", side_effect=side_effect):
+    with patch("app.services.monitor_service.check_server", side_effect=side_effect):
         res = client.post("/checks/run")
 
     assert res.status_code == 200
@@ -144,7 +144,7 @@ def test_check_history(client):
     """점검 이력 조회."""
     sid = _register_server(client, "hist", "http://example.com")
 
-    with patch("app.routers.checks.check_server") as mock_check:
+    with patch("app.services.monitor_service.check_server") as mock_check:
         mock_check.return_value = {
             "status": "UP",
             "status_code": 200,
@@ -157,3 +157,26 @@ def test_check_history(client):
     res = client.get(f"/checks/history/{sid}")
     assert res.status_code == 200
     assert len(res.json()) == 2
+
+
+def test_realtime_prediction_during_check(client):
+    """상태 점검 시 실시간 AI 장애 위험 예측 및 Prometheus 메트릭 갱신이 일어나는지 검증."""
+    sid = _register_server(client, "ai-test-server", "http://localhost:8000/mock/normal", importance="HIGH")
+
+    # 1. 점검 실행
+    with patch("app.services.monitor_service.check_server") as mock_check:
+        mock_check.return_value = {
+            "status": "UP",
+            "status_code": 200,
+            "response_time_ms": 100.0,
+            "message": "정상 작동 중",
+        }
+        res = client.post(f"/checks/run/{sid}")
+
+    assert res.status_code == 200
+
+    # 2. Prometheus 메트릭(/metrics)에 실시간 위험 점수 수집 게이지가 포함되어 있는지 검증
+    metrics_res = client.get("/metrics")
+    assert metrics_res.status_code == 200
+    assert "opswatch_server_risk_score" in metrics_res.text
+

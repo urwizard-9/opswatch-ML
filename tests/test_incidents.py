@@ -8,7 +8,7 @@ def _setup_down_incident(client) -> tuple[int, int]:
     res = client.post("/servers", json={"name": "err-srv", "url": "http://err.com"})
     sid = res.json()["id"]
 
-    with patch("app.routers.checks.check_server") as mock_check:
+    with patch("app.services.monitor_service.check_server") as mock_check:
         mock_check.return_value = {
             "status": "DOWN",
             "status_code": 500,
@@ -98,7 +98,7 @@ def test_new_incident_after_resolve(client):
     client.put(f"/incidents/{iid}/resolve", json={"reason": "r", "action_taken": "a"})
 
     # 동일 서버 재DOWN
-    with patch("app.routers.checks.check_server") as mock_check:
+    with patch("app.services.monitor_service.check_server") as mock_check:
         mock_check.return_value = {
             "status": "DOWN",
             "status_code": 500,

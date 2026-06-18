@@ -5,15 +5,13 @@ CHECK_INTERVAL_SECONDS 주기로 활성 서버 전체를 자동 점검합니다.
 """
 
 import asyncio
-from datetime import datetime, timezone
 
 from app.config import settings
 from app.database import SessionLocal
 from app.logging_config import get_logger
 from app.models import Incident, Server
 from app.routers.metrics import update_gauge_from_results, update_incident_gauge
-from app.services.incident_service import create_incident_if_needed
-from app.services.monitor_service import check_server
+from app.services.monitor_service import run_monitoring_pipeline
 
 logger = get_logger(__name__)
 
@@ -37,31 +35,12 @@ async def run_scheduled_checks() -> None:
 
             logger.info("SCHEDULER_RUN | 점검 대상 %d대", len(servers))
 
-            from app.models import CheckResult
-
             results = []
-            now = datetime.now(timezone.utc)
 
             for server in servers:
-                result = await check_server(server.url)
+                # 공통 모니터링 파이프라인 수행 (점검 ➔ 저장 ➔ 준실시간 AI 추론 ➔ 메트릭 ➔ Incident 생성)
+                result = await run_monitoring_pipeline(db, server)
                 results.append(result)
-
-                # DB에 점검 결과 저장
-                check_record = CheckResult(
-                    server_id=server.id,
-                    status=result["status"],
-                    status_code=result["status_code"],
-                    response_time_ms=result["response_time_ms"],
-                    message=result["message"],
-                    checked_at=now,
-                )
-                db.add(check_record)
-
-                # DOWN이면 Incident 자동 생성
-                if result["status"] == "DOWN":
-                    create_incident_if_needed(db, server.id, result["message"])
-
-            db.commit()
 
             # 게이지 메트릭 갱신
             update_gauge_from_results(results)
@@ -83,3 +62,4 @@ async def run_scheduled_checks() -> None:
             logger.exception("SCHEDULER_ERROR | 스케줄러 실행 중 예외 발생")
         finally:
             db.close()
+

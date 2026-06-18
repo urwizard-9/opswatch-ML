@@ -1,5 +1,6 @@
 """OpsWatch 상태 점검 API 라우터."""
 
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,8 +9,9 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import CheckResult, Server
 from app.schemas import CheckResultResponse, CheckRunAllResponse, CheckRunResponse
-from app.services.incident_service import create_incident_if_needed
-from app.services.monitor_service import check_server
+from app.services.monitor_service import run_monitoring_pipeline
+
+logger = logging.getLogger("opswatch")
 
 router = APIRouter(prefix="/checks", tags=["Checks"])
 
@@ -23,24 +25,9 @@ async def run_check_single(server_id: int, db: Session = Depends(get_db)):
     if not server.is_active:
         raise HTTPException(status_code=400, detail="비활성 서버는 점검할 수 없습니다")
 
-    result = await check_server(server.url)
+    # 공통 모니터링 파이프라인 수행 (점검 ➔ 저장 ➔ 준실시간 AI 추론 ➔ 메트릭 ➔ Incident 생성)
+    result = await run_monitoring_pipeline(db, server)
     now = datetime.now(timezone.utc)
-
-    # DB에 점검 결과 저장
-    check_record = CheckResult(
-        server_id=server.id,
-        status=result["status"],
-        status_code=result["status_code"],
-        response_time_ms=result["response_time_ms"],
-        message=result["message"],
-        checked_at=now,
-    )
-    db.add(check_record)
-    db.commit()
-
-    # DOWN이면 Incident 자동 생성
-    if result["status"] == "DOWN":
-        create_incident_if_needed(db, server.id, result["message"])
 
     return CheckRunResponse(
         server_id=server.id,
@@ -64,23 +51,8 @@ async def run_check_all(db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
 
     for server in servers:
-        result = await check_server(server.url)
-
-        # DB에 점검 결과 저장
-        check_record = CheckResult(
-            server_id=server.id,
-            status=result["status"],
-            status_code=result["status_code"],
-            response_time_ms=result["response_time_ms"],
-            message=result["message"],
-            checked_at=now,
-        )
-        db.add(check_record)
-
-        # DOWN이면 Incident 자동 생성
-        if result["status"] == "DOWN":
-            create_incident_if_needed(db, server.id, result["message"])
-
+        # 공통 모니터링 파이프라인 수행 (점검 ➔ 저장 ➔ 준실시간 AI 추론 ➔ 메트릭 ➔ Incident 생성)
+        result = await run_monitoring_pipeline(db, server)
         results.append(
             CheckRunResponse(
                 server_id=server.id,
@@ -92,8 +64,6 @@ async def run_check_all(db: Session = Depends(get_db)):
                 checked_at=now,
             )
         )
-
-    db.commit()
 
     # 상태별 집계
     up_count = sum(1 for r in results if r.status == "UP")

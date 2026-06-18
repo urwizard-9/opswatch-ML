@@ -4,14 +4,20 @@
 """
 
 import time
+from datetime import datetime, timezone
 
 import httpx
+from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.logging_config import get_logger
-from app.routers.metrics import update_check_metrics
+from app.models import CheckResult, Server
+from app.routers.metrics import update_check_metrics, update_server_risk_metric
+from app.services.incident_service import create_incident_if_needed
+from app.services.risk_predictor import predict_realtime_server_risk
 
 logger = get_logger(__name__)
+
 
 
 async def check_server(url: str) -> dict:
@@ -78,3 +84,50 @@ async def check_server(url: str) -> dict:
         }
         update_check_metrics("DOWN", None)
         return result
+
+
+async def run_monitoring_pipeline(db: Session, server: Server) -> dict:
+    """단일 서버의 점검, DB 저장, 준실시간 AI 위험 예측 및 Incident 생성을 총괄하는 공통 파이프라인입니다."""
+    # 1. 상태 점검 실행
+    result = await check_server(server.url)
+    now = datetime.now(timezone.utc)
+
+    # 2. CheckResult 객체 생성 및 DB commit() 완료 (순서 정밀화: 예측 전에 이력 저장 완료)
+    check_record = CheckResult(
+        server_id=server.id,
+        status=result["status"],
+        status_code=result["status_code"],
+        response_time_ms=result["response_time_ms"],
+        message=result["message"],
+        checked_at=now,
+    )
+    db.add(check_record)
+    db.commit()
+
+    # 3. 준실시간 AI 장애 예측 수행
+    try:
+        pred_res = predict_realtime_server_risk(db, server, result)
+        risk_score = pred_res["risk_score"]
+        is_down_pred = pred_res["is_down_pred"]
+
+        # Prometheus 메트릭 갱신
+        update_server_risk_metric(server.id, server.name, risk_score)
+
+        # 로그 출력 (준실시간 로그 명칭 정정)
+        logger.info(
+            f"ML_SEMI_REALTIME_PREDICT | server_id={server.id} | name={server.name} | pred={is_down_pred} | risk={risk_score:.4f}"
+        )
+
+        if risk_score >= 0.8:
+            logger.warning(
+                f"ML_HIGH_RISK_DETECTED | server_id={server.id} | name={server.name} | risk={risk_score:.4f} | 장애 위험 임박"
+            )
+    except Exception as e:
+        logger.warning(f"ML_SEMI_REALTIME_PREDICT_FAILED | server_id={server.id} | err={e}")
+
+    # 4. DOWN 상태 시 Incident 자동 생성 (중복 방지 연동)
+    if result["status"] == "DOWN":
+        create_incident_if_needed(db, server.id, result["message"])
+
+    return result
+

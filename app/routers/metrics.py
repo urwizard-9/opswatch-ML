@@ -25,6 +25,13 @@ servers_down = Gauge("opswatch_servers_down", "현재 DOWN 상태 서버 수")
 # ── 게이지: 현재 OPEN 장애 수 ──
 incidents_open = Gauge("opswatch_incidents_open", "현재 OPEN 상태 Incident 수")
 
+# ── 게이지: 서버별 실시간 AI 장애 위험 점수 ──
+server_risk_score = Gauge(
+    "opswatch_server_risk_score",
+    "서버별 실시간 AI 장애 위험 점수 (0.0 ~ 1.0)",
+    ["server_id", "server_name"],
+)
+
 # ── 히스토그램: 응답 시간 분포 ──
 response_time_histogram = Histogram(
     "opswatch_response_time_ms",
@@ -69,3 +76,9 @@ def update_gauge_from_results(results: list[dict]) -> None:
 def update_incident_gauge(open_count: int) -> None:
     """현재 OPEN Incident 수를 게이지에 반영합니다."""
     incidents_open.set(open_count)
+
+
+def update_server_risk_metric(server_id: int, server_name: str, risk_score: float) -> None:
+    """서버별 실시간 AI 장애 위험 점수 게이지를 업데이트합니다."""
+    server_risk_score.labels(server_id=str(server_id), server_name=server_name).set(risk_score)
+
