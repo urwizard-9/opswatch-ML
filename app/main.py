@@ -3,7 +3,9 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 import app.database as _db
 from app.config import settings
@@ -46,6 +48,27 @@ app = FastAPI(
     description="배포 서버 통신 상태 모니터링 및 장애 이력관리 시스템",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Pydantic 입력값 검증 오류 발생 시 상세 내용을 WARNING 로그로 기록합니다."""
+    errors = exc.errors()
+    err_msgs = []
+    for err in errors:
+        loc = " -> ".join(str(loc_val) for loc_val in err.get("loc", []))
+        msg = err.get("msg", "unknown error")
+        err_msgs.append(f"{loc}: {msg}")
+
+    joined_msg = " | ".join(err_msgs)
+    logger.warning(
+        "VALIDATION_FAILED | endpoint=%s | error=%s", request.url.path, joined_msg
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": errors},
+    )
 
 # 라우터 등록
 app.include_router(servers.router)
