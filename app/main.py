@@ -3,9 +3,9 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request
+from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
 
 import app.database as _db
 from app.config import settings
@@ -65,10 +65,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         "VALIDATION_FAILED | endpoint=%s | error=%s", request.url.path, joined_msg
     )
 
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": errors},
-    )
+    return await request_validation_exception_handler(request, exc)
 
 # 라우터 등록
 app.include_router(servers.router)
