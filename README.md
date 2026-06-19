@@ -11,7 +11,7 @@
 
 | 항목 | 내용 |
 |---|---|
-| **프로젝트** | 인공지능파이프라인 종합프로젝트 (26-1) |
+| **프로젝트** | 인공지능파이프라인 기말 프로젝트 (26-1) |
 | **기술 스택** | Python 3.13 / FastAPI / SQLAlchemy / Prometheus / Grafana / MLflow |
 | **배포** | Docker / Render (FastAPI) |
 | **배포 URL** | https://opswatch-ml-service.onrender.com |
