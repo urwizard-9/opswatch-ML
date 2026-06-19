@@ -11,35 +11,39 @@
 
 | 항목 | 내용 |
 |---|---|
-| **프로젝트** | 인공지능파이프라인 중간프로젝트 (26-1) |
-| **기술 스택** | Python 3.13 / FastAPI / SQLAlchemy / Prometheus / Grafana |
-| **배포** | Docker / Render |
-| **CI/CD** | GitHub Actions (ruff + pytest + Docker smoke test) |
-| **테스트** | pytest 30개, 커버리지 86% |
+| **프로젝트** | 인공지능파이프라인 종합프로젝트 (26-1) |
+| **기술 스택** | Python 3.13 / FastAPI / SQLAlchemy / Prometheus / Grafana / MLflow |
+| **배포** | Docker / Render (FastAPI) |
+| **배포 URL** | https://opswatch-ml-service.onrender.com |
+| **CI/CD** | GitHub Actions (ruff + pytest + Docker 빌드 + ML 학습 자동화) |
+| **테스트** | pytest 35개, 커버리지 80%+ |
 
 ---
 
-## 🏗️ DevOps 파이프라인
+## 🏗️ DevOps & MLOps 파이프라인
 
 ```
-코드 작성 (feature/* 브랜치)
+[코드/데이터 수정] ➔ Git Push ➔ GitHub Actions CI/CD
+    ├─ ci.yml: ruff 코드 품질 검사 + pytest (35개 테스트 검증)
+    ├─ docker-verify.yml: Docker 빌드 + Smoke Test (/health, /ml/model-info 확인)
+    └─ train.yml: MLflow 연동 RandomForest/Logistic Regression 학습 및 트래킹 자동화
     ↓
-Git Push → GitHub Actions CI
-    ├─ ruff 코드 품질 검사
-    ├─ pytest (30개 테스트, 커버리지 70%+ 검증)
-    └─ Docker 빌드 + Smoke Test (/health 200 확인)
+[Render 자동 배포] (main 브랜치)
     ↓
-Render 자동 배포 (main 브랜치)
+[MLflow Model Registry] ➔ Champion 모델 에일리어스(Alias) 지정 (운영자)
     ↓
-FastAPI 서비스 운영
-    ├─ 60초 백그라운드 스케줄러 → 전체 서버 자동 점검
-    ├─ DOWN 감지 → Incident 자동 생성 (중복 방지)
-    ├─ 구조화된 로그 (이벤트 기반)
-    └─ GET /metrics → Prometheus 메트릭 노출
-         ↓
-docker-compose up -d (로컬 모니터링)
-    ├─ Prometheus (15초 스크레이프)
-    └─ Grafana 대시보드 (6개 패널)
+[FastAPI 서비스 운영]
+    ├─ MLflow Registry 기반 Champion 모델 적재 (이중화 Fallback 지원)
+    ├─ 60초 백그라운드 스케줄러 ➔ run_monitoring_pipeline() 실행
+    │   ├─ 상태 점검 (UP/SLOW/DOWN) 및 DB 저장 (CheckResult)
+    │   ├─ Champion 모델 기반 실시간 장애 위험 예측 및 로그/경고 로깅
+    │   ├─ Prometheus 게이지 메트릭 갱신 (opswatch_server_risk_score)
+    │   └─ DOWN 감지 ➔ Incident 자동 생성 (중복 방지)
+    └─ /ml/reload-model API ➔ 서비스 중단 없는 실시간 롤백 및 캐시 갱신
+    ↓
+[Prometheus & Grafana] (로컬 모니터링)
+    ├─ Prometheus: Render 메트릭 스크레이프
+    └─ Grafana 대시보드: 실시간 AI 장애 위험 점수 추이 및 서버 통계 시각화
 ```
 
 ---
@@ -101,6 +105,9 @@ ruff check app/ tests/
 | `GET` | `/incidents/{id}` | 장애 상세 조회 |
 | `PUT` | `/incidents/{id}/resolve` | 장애 해결 처리 |
 | `GET` | `/metrics` | Prometheus 메트릭 |
+| `GET` | `/ml/model-info` | ML: 서빙 중인 모델 메타정보 조회 |
+| `POST` | `/ml/predict-risk` | ML: 장애 확률 수동 추론 (검증용) |
+| `POST` | `/ml/reload-model` | ML: 최신 Champion 모델 런타임 무중단 갱신/롤백 |
 | `GET` | `/mock/normal` | Mock: 정상 응답 (200) |
 | `GET` | `/mock/slow` | Mock: 지연 응답 (3초) |
 | `GET` | `/mock/error` | Mock: 에러 응답 (500) |
@@ -119,6 +126,7 @@ ruff check app/ tests/
 | `opswatch_servers_down` | Gauge | 현재 DOWN 서버 수 |
 | `opswatch_incidents_open` | Gauge | 현재 OPEN Incident 수 |
 | `opswatch_response_time_ms` | Histogram | 응답 시간 분포 |
+| `opswatch_server_risk_score` | Gauge | AI 기반 실시간 장애 위험 점수 (server_name 라벨) |
 
 ---
 
@@ -128,31 +136,38 @@ ruff check app/ tests/
 opswatch/
 ├── app/
 │   ├── main.py                  # FastAPI 진입점 + lifespan
-│   ├── database.py              # SQLAlchemy 설정
-│   ├── models.py                # ORM 모델
-│   ├── schemas.py               # Pydantic 스키마
-│   ├── core/
-│   │   ├── config.py            # 환경변수 설정
-│   │   └── logging_config.py    # 구조화된 로깅
+│   ├── database.py              # SQLAlchemy 데이터베이스 설정
+│   ├── models.py                # ORM 모델 정의 (Server, CheckResult, Incident)
+│   ├── schemas.py               # Pydantic 스키마 정의 (MLPredictRequest 등 포함)
+│   ├── config.py                # 환경변수 및 MLflow 설정
+│   ├── model_loader.py          # MLflow Model Registry Champion 로더
+│   ├── logging_config.py        # 구조화된 운영 로깅 설정
 │   ├── routers/
 │   │   ├── servers.py           # Server CRUD
 │   │   ├── checks.py            # 상태 점검
 │   │   ├── incidents.py         # 장애 이력
 │   │   ├── metrics.py           # Prometheus /metrics
-│   │   └── mock_targets.py      # Mock 대상 서버
+│   │   ├── ml.py                # ML API (/ml/model-info, /ml/reload-model 등)
+│   │   └── mock_targets.py      # Mock 대상 서버 시뮬레이터
 │   └── services/
-│       ├── monitor_service.py   # httpx 상태 판별
-│       ├── incident_service.py  # Incident 자동 생성
-│       └── scheduler.py         # 백그라운드 스케줄러
-├── tests/                       # pytest 30개
+│       ├── monitor_service.py   # httpx 점검 + AI 예측 연동 파이프라인
+│       ├── incident_service.py  # Incident 자동 생성 및 완충 관리
+│       ├── risk_predictor.py    # scikit-learn Champion 기반 실시간 장애 예측
+│       └── scheduler.py         # 백그라운드 자동 모니터링 스케줄러
+├── ml/
+│   ├── data/
+│   │   ├── train_v2.csv         # ML 학습용 증강 데이터셋
+│   │   └── test.csv             # ML 평가용 검증 데이터셋
+│   └── train.py                 # RF/LR 다중 모델 학습 및 MLflow 트래킹 연동 스크립트
+├── tests/                       # 통합 테스트 suite (총 35개)
 ├── prometheus/                  # Prometheus 설정
-├── grafana/                     # Grafana 프로비저닝
-├── .github/workflows/           # CI/CD 워크플로우
-├── Dockerfile                   # 멀티스테이지 빌드
-├── docker-compose.yml           # 3서비스 스택
-├── render.yaml                  # Render 배포 설정
-├── pyproject.toml               # ruff/pytest 설정
-└── requirements.txt             # 의존성
+├── grafana/                     # Grafana 프로비저닝 (실시간 AI 위험 지수 시각화 대시보드)
+├── .github/workflows/           # CI/CD & MLOps 워크플로우 (ci.yml, docker-verify.yml, train.yml)
+├── Dockerfile                   # 멀티스테이지 컨테이너 빌드
+├── docker-compose.yml           # Prometheus/Grafana 로컬 시각화 스택
+├── render.yaml                  # Render IaC Blueprint 설정
+├── pyproject.toml               # ruff/pytest/pythonpath 구성 설정
+└── requirements.txt             # 패키지 의존성 정의
 ```
 
 ---
