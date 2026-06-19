@@ -50,13 +50,14 @@ def predict_incident_risk(request: MLPredictRequest) -> dict:
 def predict_realtime_server_risk(db: Session, server: Server, result: dict) -> dict:
     """실시간 점검 결과를 바탕으로 머신러닝 장애 예측을 수행합니다."""
     # 1. 최근 5회 중 실패(DOWN) 횟수 계산
-    recent_failures = (
+    recent_results = (
         db.query(CheckResult)
-        .filter(CheckResult.server_id == server.id, CheckResult.status == "DOWN")
+        .filter(CheckResult.server_id == server.id)
         .order_by(CheckResult.checked_at.desc())
         .limit(5)
-        .count()
+        .all()
     )
+    recent_failures = sum(1 for r in recent_results if r.status == "DOWN")
 
     # 2. 중요도 문자열을 숫자로 매핑 (LOW=1, MEDIUM=2, HIGH=3)
     importance_map = {"LOW": 1, "MEDIUM": 2, "HIGH": 3}
